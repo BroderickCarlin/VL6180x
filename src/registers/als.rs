@@ -3,11 +3,10 @@
 //! These registers configure the ambient light sensor including gain,
 //! integration time, and thresholds.
 
-use core::convert::Infallible;
-use jiff::Span;
+use core::{convert::Infallible, time::Duration};
 use regiface::{register, FromByteArray, ReadableRegister, ToByteArray, WritableRegister};
 
-use crate::types::{AlsGain, Luminance};
+use crate::types::{AlsGain, Luminance, RegisterError};
 
 /// ALS Start Register (0x038)
 ///
@@ -104,7 +103,7 @@ impl ToByteArray for AlsThresholds {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AlsIntermeasurementPeriod {
     /// Period between measurements
-    pub period: Span,
+    pub period: Duration,
 }
 
 impl FromByteArray for AlsIntermeasurementPeriod {
@@ -113,20 +112,29 @@ impl FromByteArray for AlsIntermeasurementPeriod {
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
         // Period is in units of 10ms: value 0 = 10ms, value 1 = 20ms, etc.
-        let milliseconds = (bytes[0] as i64 + 1) * 10;
-        let period = Span::new().milliseconds(milliseconds);
+        let milliseconds = (bytes[0] as u64 + 1) * 10;
+        let period = Duration::from_millis(milliseconds);
         Ok(Self { period })
     }
 }
 
 impl ToByteArray for AlsIntermeasurementPeriod {
-    type Error = Infallible;
+    type Error = RegisterError;
     type Array = [u8; 1];
 
     fn to_bytes(self) -> Result<Self::Array, Self::Error> {
-        // Convert back to units of 10ms
-        let total_ms = self.period.get_milliseconds();
-        let value = ((total_ms / 10) - 1).max(0).min(255) as u8;
+        // Convert to units of 10ms
+        // Valid range: 10ms to 2560ms (value 0-255 in register)
+        let total_ms = self.period.as_millis() as u64;
+
+        if total_ms < 10 {
+            return Err(RegisterError::DurationTooShort);
+        }
+        if total_ms > 2560 {
+            return Err(RegisterError::DurationTooLong);
+        }
+
+        let value = (((total_ms + 5) / 10) - 1) as u8;
         Ok([value])
     }
 }
@@ -143,7 +151,7 @@ pub struct AlsAnalogueGain {
 }
 
 impl FromByteArray for AlsAnalogueGain {
-    type Error = ();
+    type Error = RegisterError;
     type Array = [u8; 1];
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
@@ -169,7 +177,7 @@ impl ToByteArray for AlsAnalogueGain {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AlsIntegrationPeriod {
     /// Integration period
-    pub period: Span,
+    pub period: Duration,
 }
 
 impl FromByteArray for AlsIntegrationPeriod {
@@ -178,17 +186,26 @@ impl FromByteArray for AlsIntegrationPeriod {
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
         // Integration period is in milliseconds
-        let period = Span::new().milliseconds(bytes[0] as i64);
+        let period = Duration::from_millis(bytes[0] as u64);
         Ok(Self { period })
     }
 }
 
 impl ToByteArray for AlsIntegrationPeriod {
-    type Error = Infallible;
+    type Error = RegisterError;
     type Array = [u8; 1];
 
     fn to_bytes(self) -> Result<Self::Array, Self::Error> {
-        let ms = self.period.get_milliseconds().max(1).min(255) as u8;
-        Ok([ms])
+        // Valid range: 1ms to 255ms
+        let ms = self.period.as_millis() as u64;
+
+        if ms < 1 {
+            return Err(RegisterError::DurationTooShort);
+        }
+        if ms > 255 {
+            return Err(RegisterError::DurationTooLong);
+        }
+
+        Ok([ms as u8])
     }
 }

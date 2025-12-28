@@ -77,6 +77,7 @@ if status.error_code.is_valid() {
 ### Continuous Range Measurements
 
 ```rust
+use core::time::Duration;
 use vl6180x::{
     Device,
     registers::{
@@ -85,13 +86,12 @@ use vl6180x::{
         InterruptClear,
     },
 };
-use jiff::Span;
 
 let mut sensor = Device::new(i2c);
 
 // Configure intermeasurement period (100ms)
 sensor.write_register(RangeIntermeasurementPeriod {
-    period: Span::new().milliseconds(100),
+    period: Duration::from_millis(100),
 })?;
 
 // Start continuous measurements
@@ -120,6 +120,7 @@ loop {
 ### Ambient Light Sensing
 
 ```rust
+use core::time::Duration;
 use vl6180x::{
     Device,
     registers::{
@@ -128,7 +129,6 @@ use vl6180x::{
     },
     types::AlsGain,
 };
-use jiff::Span;
 
 let mut sensor = Device::new(i2c);
 
@@ -139,7 +139,7 @@ sensor.write_register(AlsAnalogueGain {
 
 // Configure integration period (100ms)
 sensor.write_register(AlsIntegrationPeriod {
-    period: Span::new().milliseconds(100),
+    period: Duration::from_millis(100),
 })?;
 
 // Start single-shot ALS measurement

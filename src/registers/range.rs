@@ -3,10 +3,11 @@
 //! These registers configure the ranging sensor including measurement timing,
 //! crosstalk compensation, and convergence settings.
 
-use core::convert::Infallible;
-use jiff::Span;
+use core::{convert::Infallible, time::Duration};
 use measurements::Length;
 use regiface::{register, FromByteArray, ReadableRegister, ToByteArray, WritableRegister};
+
+use crate::types::RegisterError;
 
 /// Range Start Register (0x018)
 ///
@@ -99,7 +100,7 @@ impl ToByteArray for RangeThresholds {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RangeIntermeasurementPeriod {
     /// Period between measurements
-    pub period: Span,
+    pub period: Duration,
 }
 
 impl FromByteArray for RangeIntermeasurementPeriod {
@@ -108,20 +109,29 @@ impl FromByteArray for RangeIntermeasurementPeriod {
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
         // Period is in units of 10ms: value 0 = 10ms, value 1 = 20ms, etc.
-        let milliseconds = (bytes[0] as i64 + 1) * 10;
-        let period = Span::new().milliseconds(milliseconds);
+        let milliseconds = (bytes[0] as u64 + 1) * 10;
+        let period = Duration::from_millis(milliseconds);
         Ok(Self { period })
     }
 }
 
 impl ToByteArray for RangeIntermeasurementPeriod {
-    type Error = Infallible;
+    type Error = RegisterError;
     type Array = [u8; 1];
 
     fn to_bytes(self) -> Result<Self::Array, Self::Error> {
-        // Convert back to units of 10ms
-        let total_ms = self.period.get_milliseconds();
-        let value = ((total_ms / 10) - 1).max(0).min(255) as u8;
+        // Convert to units of 10ms
+        // Valid range: 10ms to 2560ms (value 0-255 in register)
+        let total_ms = self.period.as_millis() as u64;
+
+        if total_ms < 10 {
+            return Err(RegisterError::DurationTooShort);
+        }
+        if total_ms > 2560 {
+            return Err(RegisterError::DurationTooLong);
+        }
+
+        let value = (((total_ms + 5) / 10) - 1) as u8;
         Ok([value])
     }
 }
@@ -134,7 +144,7 @@ impl ToByteArray for RangeIntermeasurementPeriod {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RangeMaxConvergenceTime {
     /// Maximum convergence time
-    pub time: Span,
+    pub time: Duration,
 }
 
 impl FromByteArray for RangeMaxConvergenceTime {
@@ -142,18 +152,27 @@ impl FromByteArray for RangeMaxConvergenceTime {
     type Array = [u8; 1];
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
-        let time = Span::new().milliseconds(bytes[0] as i64);
+        let time = Duration::from_millis(bytes[0] as u64);
         Ok(Self { time })
     }
 }
 
 impl ToByteArray for RangeMaxConvergenceTime {
-    type Error = Infallible;
+    type Error = RegisterError;
     type Array = [u8; 1];
 
     fn to_bytes(self) -> Result<Self::Array, Self::Error> {
-        let ms = self.time.get_milliseconds().max(1).min(63) as u8;
-        Ok([ms])
+        // Valid range: 1ms to 63ms
+        let ms = self.time.as_millis() as u64;
+
+        if ms < 1 {
+            return Err(RegisterError::DurationTooShort);
+        }
+        if ms > 63 {
+            return Err(RegisterError::DurationTooLong);
+        }
+
+        Ok([ms as u8])
     }
 }
 

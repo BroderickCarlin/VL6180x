@@ -2,6 +2,41 @@
 
 use core::fmt;
 
+/// Unified error type for register operations
+///
+/// This error type covers all failure modes that can occur during
+/// register serialization and deserialization operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum RegisterError {
+    /// Invalid enum value encountered during deserialization
+    /// Contains the raw byte value that was invalid
+    InvalidEnumValue(u8),
+    /// Duration value is too short for register requirements
+    DurationTooShort,
+    /// Duration value is too long for register requirements
+    DurationTooLong,
+    /// Invalid date/time value in timestamp
+    InvalidTimestamp,
+}
+
+impl fmt::Display for RegisterError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidEnumValue(value) => write!(f, "Invalid enum value: 0x{:02X}", value),
+            Self::DurationTooShort => write!(f, "Duration is too short"),
+            Self::DurationTooLong => write!(f, "Duration is too long"),
+            Self::InvalidTimestamp => write!(f, "Invalid timestamp"),
+        }
+    }
+}
+
+impl From<jiff::Error> for RegisterError {
+    fn from(_: jiff::Error) -> Self {
+        Self::InvalidTimestamp
+    }
+}
+
 /// Luminance measurement in lux
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -31,14 +66,14 @@ pub enum AlsErrorCode {
 }
 
 impl TryFrom<u8> for AlsErrorCode {
-    type Error = ();
+    type Error = RegisterError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::NoError),
             1 => Ok(Self::Overflow),
             2 => Ok(Self::Underflow),
-            _ => Err(()),
+            _ => Err(RegisterError::InvalidEnumValue(value)),
         }
     }
 }
@@ -82,7 +117,7 @@ pub enum RangeErrorCode {
 }
 
 impl TryFrom<u8> for RangeErrorCode {
-    type Error = ();
+    type Error = RegisterError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -100,7 +135,7 @@ impl TryFrom<u8> for RangeErrorCode {
             13 => Ok(Self::RawRangingOverflow),
             14 => Ok(Self::RangingUnderflow),
             15 => Ok(Self::RangingOverflow),
-            _ => Err(()),
+            _ => Err(RegisterError::InvalidEnumValue(value)),
         }
     }
 }
@@ -141,7 +176,7 @@ pub enum AlsGain {
 }
 
 impl TryFrom<u8> for AlsGain {
-    type Error = ();
+    type Error = RegisterError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value & 0b111 {
@@ -153,7 +188,7 @@ impl TryFrom<u8> for AlsGain {
             5 => Ok(Self::Gain1_25),
             6 => Ok(Self::Gain1),
             7 => Ok(Self::Gain40),
-            _ => Err(()),
+            _ => Err(RegisterError::InvalidEnumValue(value)),
         }
     }
 }
@@ -186,13 +221,13 @@ pub enum GpioPolarity {
 }
 
 impl TryFrom<u8> for GpioPolarity {
-    type Error = ();
+    type Error = RegisterError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value & 0b1 {
             0 => Ok(Self::ActiveLow),
             1 => Ok(Self::ActiveHigh),
-            _ => Err(()),
+            _ => Err(RegisterError::InvalidEnumValue(value)),
         }
     }
 }
@@ -209,13 +244,13 @@ pub enum GpioFunction {
 }
 
 impl TryFrom<u8> for GpioFunction {
-    type Error = ();
+    type Error = RegisterError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value & 0b1 {
             0 => Ok(Self::Off),
             1 => Ok(Self::InterruptOutput),
-            _ => Err(()),
+            _ => Err(RegisterError::InvalidEnumValue(value)),
         }
     }
 }
@@ -239,7 +274,7 @@ pub enum InterruptMode {
 }
 
 impl TryFrom<u8> for InterruptMode {
-    type Error = ();
+    type Error = RegisterError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value & 0b111 {
@@ -248,7 +283,7 @@ impl TryFrom<u8> for InterruptMode {
             2 => Ok(Self::LevelHigh),
             3 => Ok(Self::OutOfWindow),
             4 => Ok(Self::NewSampleReady),
-            _ => Err(()),
+            _ => Err(RegisterError::InvalidEnumValue(value)),
         }
     }
 }

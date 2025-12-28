@@ -3,11 +3,11 @@
 //! These registers contain measurement results from both the ranging
 //! and ambient light sensors.
 
-use jiff::Span;
+use core::time::Duration;
 use measurements::Length;
 use regiface::{register, FromByteArray, ReadableRegister};
 
-use crate::types::{AlsErrorCode, RangeErrorCode};
+use crate::types::{AlsErrorCode, RangeErrorCode, RegisterError};
 
 /// Range Result Value Register (0x062)
 ///
@@ -45,7 +45,7 @@ pub struct RangeResultStatus {
 }
 
 impl FromByteArray for RangeResultStatus {
-    type Error = ();
+    type Error = RegisterError;
     type Array = [u8; 1];
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
@@ -122,7 +122,7 @@ pub struct ResultAlsStatus {
 }
 
 impl FromByteArray for ResultAlsStatus {
-    type Error = ();
+    type Error = RegisterError;
     type Array = [u8; 1];
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
@@ -144,7 +144,7 @@ impl FromByteArray for ResultAlsStatus {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RangeResultConvergenceTime {
     /// Convergence time
-    pub time: Span,
+    pub time: Duration,
 }
 
 impl FromByteArray for RangeResultConvergenceTime {
@@ -153,7 +153,7 @@ impl FromByteArray for RangeResultConvergenceTime {
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
         let time_ms = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-        let time = Span::new().milliseconds(time_ms as i64);
+        let time = Duration::from_millis(time_ms as u64);
         Ok(Self { time })
     }
 }

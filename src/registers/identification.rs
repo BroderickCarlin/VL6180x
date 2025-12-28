@@ -7,6 +7,8 @@ use core::convert::Infallible;
 use jiff::civil::DateTime;
 use regiface::{register, FromByteArray, ReadableRegister};
 
+use crate::types::RegisterError;
+
 /// Model ID Register (0x000)
 ///
 /// Expected value: VL6180X (0xB4)
@@ -103,7 +105,7 @@ pub struct ModuleTimestamp {
 }
 
 impl FromByteArray for ModuleTimestamp {
-    type Error = jiff::Error;
+    type Error = RegisterError;
     type Array = [u8; 4];
 
     fn from_bytes(bytes: Self::Array) -> Result<Self, Self::Error> {
