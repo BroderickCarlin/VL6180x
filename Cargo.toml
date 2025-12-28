@@ -1,7 +1,7 @@
 [package]
 name = "vl6180x"
 description = "A embedded-hal driver for the VL6180X proximity and ambient light sensor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Broderick Carlin <broderick.carlin@gmail.com>"]
 readme = "README.md"
